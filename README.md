@@ -1,1 +1,1 @@
-# 2026_Python
+# 2026-python_practice
