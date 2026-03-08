@@ -277,6 +277,28 @@
 
     .hidden { display: none !important; }
 
+    /* 커스텀 입력창(모달) 스타일 */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7); z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-content {
+      background: #1f2937; padding: 24px; border-radius: 12px; width: 320px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #374151;
+    }
+    .modal-msg { color: white; margin-bottom: 16px; font-size: 16px; font-weight: 700; white-space: pre-wrap; word-break: keep-all; }
+    .modal-input {
+      width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #4b5563;
+      background: #111827; color: white; outline: none; margin-bottom: 16px; font-size: 16px;
+      font-family: "Pretendard","Noto Sans KR",Arial,sans-serif;
+    }
+    .modal-input:focus { border-color: #7c3aed; }
+    .modal-btns { display: flex; justify-content: flex-end; gap: 8px; }
+    .modal-btn { padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; border: none; cursor: pointer; font-family: "Pretendard","Noto Sans KR",Arial,sans-serif;}
+    .modal-btn.cancel { background: #374151; color: white; }
+    .modal-btn.ok { background: #7c3aed; color: white; }
+
     @media (max-width: 900px) {
       .app { grid-template-columns: 1fr; }
       .sidebar { border-right: 0; border-bottom: 1px solid #d1d5db; }
@@ -319,7 +341,7 @@
       </div>
 
       <div class="hint" id="sidebarTipBox"></div>
-      <div class="mini">2026년 신도고 1학년 정보수업</div>
+      <div class="mini">2026년 신도고 Python 배우기</div>
     </aside>
 
     <main class="main">
@@ -350,6 +372,28 @@
       <div class="tabs" id="tabsContainer"></div>
       <div id="panelsContainer"></div>
     </main>
+  </div>
+
+  <!-- 커스텀 입력창 HTML -->
+  <div id="customPrompt" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div id="promptMessage" class="modal-msg"></div>
+      <input type="text" id="promptInput" class="modal-input" autocomplete="off" />
+      <div class="modal-btns">
+        <button id="promptCancel" class="modal-btn cancel">취소</button>
+        <button id="promptOk" class="modal-btn ok">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⭐ 추가된 커스텀 알림창 HTML (미리보기 화면용) -->
+  <div id="customAlert" class="modal-overlay hidden">
+    <div class="modal-content" style="text-align: center;">
+      <div id="alertMessage" class="modal-msg"></div>
+      <div class="modal-btns" style="justify-content: center;">
+        <button id="alertOk" class="modal-btn ok">확인</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
@@ -447,7 +491,7 @@
           hintTitle: "힌트",
           hintText: `f-string 사용법: print(f"환영합니다, {name}님!")`,
 
-          tipText: "실행 버튼을 누르면 화면 위쪽에 작은 입력창이 나타납니다.",
+          tipText: "실행 버튼을 누르면 화면 중앙에 입력창이 나타납니다.",
           starterCode: ``,
           promptInputs: ["파이썬"],
           expectedOutput: `환영합니다, 파이썬님!`,
@@ -487,10 +531,9 @@
       ],
 
       classOptions: ["1","2","3","4","5","6","7","8","9","10"],
-      /* 번호를 29번까지로 확장 */
       numberOptions: ["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29"],
 
-      /* 👇 선생님의 구글 폼 정보로 수정완료 👇 */
+      /* 선생님 구글 폼 정보 */
       formBaseUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSe8cxQJ9GRWPLCs2BGPMe57oHtxJq-dubCAyk8RHwsuiKoQOQ/formResponse',
       entryClassroom: 'entry.1111024106',    // '반' 항목 (111 매칭)
       entryStudentNumber: 'entry.2049503448',// '번호' 항목 (222 매칭)
@@ -649,6 +692,69 @@
       return Sk.builtinFiles["files"][x];
     }
 
+    // ⭐ 브라우저 알림창을 대체하는 커스텀 입력 프롬프트 함수
+    function askUser(message, defaultValue) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('customPrompt');
+        const msgEl = document.getElementById('promptMessage');
+        const inputEl = document.getElementById('promptInput');
+        const btnOk = document.getElementById('promptOk');
+        const btnCancel = document.getElementById('promptCancel');
+
+        // 값 초기화 및 화면 표시
+        msgEl.textContent = message || '입력하세요:';
+        inputEl.value = defaultValue || '';
+        modal.classList.remove('hidden');
+        inputEl.focus();
+        inputEl.select(); // 기존 글씨 덮어쓰기 편하도록 블록지정
+
+        // 창 닫고 리스너 해제하는 함수
+        function cleanup() {
+          modal.classList.add('hidden');
+          btnOk.onclick = null;
+          btnCancel.onclick = null;
+          inputEl.onkeydown = null;
+        }
+
+        // 확인 버튼 클릭
+        btnOk.onclick = () => {
+          cleanup();
+          resolve(inputEl.value);
+        };
+
+        // 취소 버튼 클릭
+        btnCancel.onclick = () => {
+          cleanup();
+          resolve('');
+        };
+
+        // 엔터키 지원
+        inputEl.onkeydown = (e) => {
+          if (e.key === 'Enter') {
+            cleanup();
+            resolve(inputEl.value);
+          } else if (e.key === 'Escape') {
+            cleanup();
+            resolve('');
+          }
+        };
+      });
+    }
+
+    // ⭐ 브라우저 alert 창을 대체하는 커스텀 알림창 함수
+    function showAlert(message) {
+      const modal = document.getElementById('customAlert');
+      const msgEl = document.getElementById('alertMessage');
+      const btnOk = document.getElementById('alertOk');
+
+      msgEl.textContent = message;
+      modal.classList.remove('hidden');
+
+      btnOk.onclick = () => {
+        modal.classList.add('hidden');
+      };
+    }
+
     async function executePython(code, index, usePromptRealInput) {
       let output = '';
       const lesson = CONFIG.lessons[index];
@@ -661,16 +767,13 @@
         },
         read: builtinRead,
         __future__: Sk.python3,
+        // ⭐ 입력 처리 방식 변경: window.prompt -> askUser(커스텀 모달)
         inputfun: function(promptText) {
-          if (!lesson.useInputPrompt) {
-            return Promise.resolve('');
-          }
-
           if (usePromptRealInput) {
-            const value = window.prompt(promptText || '입력하세요', promptInputs[inputIndex] || '');
-            inputIndex += 1;
-            return Promise.resolve(value === null ? '' : value);
+            // [실행] 버튼 클릭 시: 탭의 설정과 무관하게 무조건 커스텀 입력창을 띄움
+            return askUser(promptText, ''); 
           } else {
+            // [정답 확인] 버튼 클릭 시: 채점을 위해 준비된 정답 데이터를 자동으로 입력
             const value = promptInputs[inputIndex] || '';
             inputIndex += 1;
             return Promise.resolve(value);
@@ -766,54 +869,44 @@
       const result = latestCheckResults[index];
 
       if (!classroom || !studentNumber) {
-        alert('반과 번호를 모두 선택하세요.');
+        showAlert('반과 번호를 모두 선택하세요.');
         return;
       }
 
       if (result === '미확인') {
-        alert('먼저 정답 확인을 눌러 채점 결과를 만든 뒤 제출하세요.');
+        showAlert('먼저 정답 확인을 눌러 채점 결과를 만든 뒤 제출하세요.');
         return;
       }
 
-      // 🌟 페이지 이동 없이 백그라운드 전송을 위한 보이지 않는 iframe 생성
-      let iframe = document.getElementById('hidden_iframe');
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.name = 'hidden_iframe';
-        iframe.id = 'hidden_iframe';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-        
-        // 전송 완료 시 실행될 알림
-        iframe.onload = function() {
-          alert('✅ 과제 제출이 완료되었습니다! (스프레드시트 전송 완료)');
-        };
-      }
+      // 🌟 제출 버튼 상태 변경 (중복 클릭 방지)
+      const submitBtn = document.getElementById('topSubmitBtn');
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = '제출 중...';
+      submitBtn.disabled = true;
 
-      // 동적 폼(Form) 생성 및 데이터 전송
-      const form = document.createElement('form');
-      form.action = CONFIG.formBaseUrl;
-      form.method = 'POST';
-      form.target = 'hidden_iframe'; // iframe으로 전송하여 화면 전환 방지
+      // 🌟 최신 fetch API를 활용한 백그라운드 안전 전송
+      const formData = new FormData();
+      formData.append(CONFIG.entryClassroom, classroom);
+      formData.append(CONFIG.entryStudentNumber, studentNumber);
+      formData.append(CONFIG.entryCode, code);
+      formData.append(CONFIG.entryResult, result);
 
-      const inputs = [
-        { name: CONFIG.entryClassroom, value: classroom },
-        { name: CONFIG.entryStudentNumber, value: studentNumber },
-        { name: CONFIG.entryCode, value: code },
-        { name: CONFIG.entryResult, value: result }
-      ];
-
-      inputs.forEach(item => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = item.name;
-        input.value = item.value;
-        form.appendChild(input);
+      fetch(CONFIG.formBaseUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: formData
+      })
+      .then(() => {
+        showAlert('✅ 과제 제출이 완료되었습니다!');
+      })
+      .catch((err) => {
+        showAlert('❌ 제출 중 오류가 발생했습니다. 네트워크 상태를 확인하세요.');
+      })
+      .finally(() => {
+        // 전송 완료 후 버튼을 원래대로 복구
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
       });
-
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form); // 전송 후 폼 요소 제거
     }
 
     function initPage() {
